@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蛙蛙工具 - 仿制版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen flex flex-col" x-data="toolApp()">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-md">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold cursor-pointer" @click="location.reload()">蛙蛙工具 - 仿制版</h1>
+            <nav class="hidden md:flex space-x-4">
+                <a href="#" class="hover:underline">关于</a>
+                <a href="#" class="hover:underline">赞赏</a>
+                <a href="#" class="hover:underline">反馈</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="flex-grow container mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
+        <!-- Sidebar -->
+        <aside class="w-full md:w-64 bg-white rounded-lg shadow p-4 h-fit">
+            <template x-for="category in categories" :key="category.name">
+                <div class="mb-6">
+                    <h2 class="text-lg font-semibold mb-3 text-gray-700 border-b pb-1" x-text="category.name"></h2>
+                    <ul class="space-y-1">
+                        <template x-for="tool in category.tools" :key="tool.id">
+                            <li>
+                                <button 
+                                    @click="selectTool(tool)"
+                                    class="w-full text-left px-3 py-2 rounded-md transition-colors text-sm"
+                                    :class="currentTool.id === tool.id ? 'bg-blue-500 text-white' : 'hover:bg-blue-50 text-gray-600'"
+                                >
+                                    <span x-text="tool.name"></span>
+                                </button>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </template>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-grow bg-white rounded-lg shadow p-6">
+            <div x-show="currentTool">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800" x-text="currentTool.name"></h2>
+                    <span x-show="currentTool.id === 'text_workflow'" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">线性工作流</span>
+                </div>
+                
+                <div class="space-y-6">
+                    <!-- Workflow Configuration (Only for text_workflow) -->
+                    <div x-show="currentTool.id === 'text_workflow'" class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4">流程配置</h3>
+                        
+                        <!-- Added Steps -->
+                        <div class="space-y-3 mb-4">
+                            <template x-for="(step, index) in workflowSteps" :key="index">
+                                <div class="flex flex-col bg-white p-3 rounded border border-gray-200 shadow-sm">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <div class="flex items-center">
+                                            <span class="bg-blue-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs mr-2" x-text="index + 1"></span>
+                                            <span class="font-medium text-sm text-gray-800" x-text="getToolName(step.id)"></span>
+                                        </div>
+                                        <button @click="removeStep(index)" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                                    </div>
+                                    
+                                    <!-- Step Parameters -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+                                        <!-- Case Convert -->
+                                        <template x-if="step.id === 'case_convert'">
+                                            <select x-model="step.params.mode" class="text-xs border rounded p-1">
+                                                <option value="upper">全部大写</option>
+                                                <option value="lower">全部小写</option>
+                                                <option value="title">首字母大写</option>
+                                            </select>
+                                        </template>
+                                        
+                                        <!-- Text Replace -->
+                                        <template x-if="step.id === 'text_replace'">
+                                            <div class="flex gap-2 col-span-2">
+                                                <input type="text" x-model="step.params.old" placeholder="查找内容" class="text-xs border rounded p-1 flex-1">
+                                                <input type="text" x-model="step.params.new" placeholder="替换内容" class="text-xs border rounded p-1 flex-1">
+                                            </div>
+                                        </template>
+
+                                        <!-- Regex Replace -->
+                                        <template x-if="step.id === 'regex_replace'">
+                                            <div class="flex gap-2 col-span-2">
+                                                <input type="text" x-model="step.params.pattern" placeholder="正则模式" class="text-xs border rounded p-1 flex-1">
+                                                <input type="text" x-model="step.params.replacement" placeholder="替换内容" class="text-xs border rounded p-1 flex-1">
+                                            </div>
+                                        </template>
+
+                                        <!-- Add Prefix/Suffix -->
+                                        <template x-if="step.id === 'add_prefix'">
+                                            <input type="text" x-model="step.params.prefix" placeholder="前缀内容" class="text-xs border rounded p-1 col-span-2">
+                                        </template>
+                                        <template x-if="step.id === 'add_suffix'">
+                                            <input type="text" x-model="step.params.suffix" placeholder="后缀内容" class="text-xs border rounded p-1 col-span-2">
+                                        </template>
+
+                                        <!-- Insert Content -->
+                                        <template x-if="step.id === 'insert_content'">
+                                            <div class="flex gap-2 col-span-2">
+                                                <input type="text" x-model="step.params.insert_text" placeholder="插入内容" class="text-xs border rounded p-1 flex-1">
+                                                <input type="number" x-model="step.params.position" placeholder="位置" class="text-xs border rounded p-1 w-20">
+                                            </div>
+                                        </template>
+
+                                        <!-- Delete Chars -->
+                                        <template x-if="step.id === 'delete_chars'">
+                                            <input type="text" x-model="step.params.chars" placeholder="要删除的字符" class="text-xs border rounded p-1 col-span-2">
+                                        </template>
+
+                                        <!-- Newline Convert -->
+                                        <template x-if="step.id === 'newline_convert'">
+                                            <select x-model="step.params.mode" class="text-xs border rounded p-1">
+                                                <option value="unix">转为 Unix (\n)</option>
+                                                <option value="windows">转为 Windows (\r\n)</option>
+                                                <option value="mac">转为 Mac (\r)</option>
+                                            </select>
+                                        </template>
+
+                                        <!-- Repeat Text -->
+                                        <template x-if="step.id === 'repeat_text'">
+                                            <input type="number" x-model="step.params.times" placeholder="重复次数" class="text-xs border rounded p-1 w-full">
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Add Step Button -->
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="t in availableWorkflowTools" :key="t.id">
+                                <button 
+                                    @click="addStep(t.id)"
+                                    class="bg-white hover:bg-gray-100 text-gray-600 border border-gray-300 px-2 py-1 rounded text-xs transition-colors"
+                                    x-text="'+ ' + t.name"
+                                ></button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Input Section -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">输入内容</label>
+                        <textarea 
+                            x-model="inputContent"
+                            class="w-full h-48 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                            placeholder="在这里输入内容..."
+                        ></textarea>
+                    </div>
+
+                    <!-- Options for specific single tools -->
+                    <template x-if="currentTool.id === 'case_convert' && !isWorkflowMode">
+                        <div class="flex gap-4">
+                            <label class="inline-flex items-center">
+                                <input type="radio" x-model="params.mode" value="upper" class="form-radio text-blue-600">
+                                <span class="ml-2">大写</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" x-model="params.mode" value="lower" class="form-radio text-blue-600">
+                                <span class="ml-2">小写</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" x-model="params.mode" value="title" class="form-radio text-blue-600">
+                                <span class="ml-2">标题</span>
+                            </label>
+                        </div>
+                    </template>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-wrap gap-4">
+                        <button 
+                            @click="processTool()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                            :disabled="loading"
+                        >
+                            <span x-show="!loading" x-text="currentTool.buttonLabel || '立即处理'"></span>
+                            <span x-show="loading">处理中...</span>
+                        </button>
+                        
+                        <button 
+                            @click="copyResult()"
+                            x-show="result"
+                            class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                        >
+                            复制结果
+                        </button>
+
+                        <button 
+                            @click="clear()"
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2 rounded-lg font-semibold transition-colors"
+                        >
+                            清空
+                        </button>
+                    </div>
+
+                    <!-- Output Section -->
+                    <div x-show="result || wordCountResult" x-cloak>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">结果</label>
+                        
+                        <!-- Text Result -->
+                        <div x-show="result">
+                            <pre x-text="result" class="w-full bg-gray-50 p-4 border border-gray-200 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono text-sm"></pre>
+                        </div>
+
+                        <!-- Word Count Result -->
+                        <div x-show="wordCountResult" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 text-center">
+                                <div class="text-sm text-blue-600 font-medium">字符数</div>
+                                <div class="text-2xl font-bold text-blue-800" x-text="wordCountResult.characters"></div>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg border border-green-100 text-center">
+                                <div class="text-sm text-green-600 font-medium">单词数</div>
+                                <div class="text-2xl font-bold text-green-800" x-text="wordCountResult.words"></div>
+                            </div>
+                            <div class="bg-purple-50 p-4 rounded-lg border border-purple-100 text-center">
+                                <div class="text-sm text-purple-600 font-medium">行数</div>
+                                <div class="text-2xl font-bold text-purple-800" x-text="wordCountResult.lines"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6">
+        <div class="container mx-auto px-4 text-center">
+            <p>&copy; 2026 蛙蛙工具 - 仿制版 版权所有</p>
+        </div>
+    </footer>
+
+    <script>
+        function toolApp() {
+            return {
+                categories: [
+                    {
+                        name: '文本工具',
+                        tools: [
+                            { id: 'text_workflow', name: '文本处理工作流', buttonLabel: '执行工作流' },
+                            { id: 'word_count', name: '字数统计', buttonLabel: '统计' }
+                        ]
+                    },
+                    {
+                        name: '编码转换',
+                        tools: [
+                            { id: 'json_format', name: 'JSON 格式化', buttonLabel: '格式化' },
+                            { id: 'base64_encode', name: 'Base64 编码', buttonLabel: '编码' },
+                            { id: 'base64_decode', name: 'Base64 解码', buttonLabel: '解码' },
+                            { id: 'url_encode', name: 'URL 编码', buttonLabel: '编码' },
+                            { id: 'url_decode', name: 'URL 解码', buttonLabel: '解码' }
+                        ]
+                    },
+                    {
+                        name: '加密安全',
+                        tools: [
+                            { id: 'md5', name: 'MD5 加密', buttonLabel: '加密' }
+                        ]
+                    }
+                ],
+                
+                availableWorkflowTools: [
+                    { id: 'case_convert', name: '大小写转换' },
+                    { id: 'text_replace', name: '文本替换' },
+                    { id: 'regex_replace', name: '正则替换' },
+                    { id: 'add_prefix', name: '增加前缀' },
+                    { id: 'add_suffix', name: '增加后缀' },
+                    { id: 'insert_content', name: '插入内容' },
+                    { id: 'newline_convert', name: '换行符转换' },
+                    { id: 'delete_empty_lines', name: '删除空行' },
+                    { id: 'delete_chars', name: '删除字符' },
+                    { id: 'add_line_numbers', name: '增加行号' },
+                    { id: 'remove_line_numbers', name: '删除行号' },
+                    { id: 'deduplicate_lines', name: '项目去重' },
+                    { id: 'trim_lines', name: '修剪行空格' },
+                    { id: 'repeat_text', name: '重复文本' },
+                    { id: 'flip_content', name: '翻转内容' }
+                ],
+
+                currentTool: null,
+                inputContent: '',
+                result: '',
+                wordCountResult: null,
+                loading: false,
+                
+                // For single tool params
+                params: {
+                    mode: 'upper'
+                },
+
+                // For workflow
+                workflowSteps: [],
+                isWorkflowMode: false,
+
+                init() {
+                    this.currentTool = this.categories[0].tools[0];
+                    this.isWorkflowMode = true;
+                },
+
+                selectTool(tool) {
+                    this.currentTool = tool;
+                    this.isWorkflowMode = (tool.id === 'text_workflow');
+                    this.clear();
+                },
+
+                clear() {
+                    this.inputContent = '';
+                    this.result = '';
+                    this.wordCountResult = null;
+                    if (this.isWorkflowMode) {
+                        this.workflowSteps = [];
+                    }
+                },
+
+                getToolName(id) {
+                    const tool = this.availableWorkflowTools.find(t => t.id === id);
+                    return tool ? tool.name : id;
+                },
+
+                addStep(toolId) {
+                    const step = {
+                        id: toolId,
+                        params: {}
+                    };
+                    
+                    // Initialize default params for specific tools
+                    if (toolId === 'case_convert') step.params.mode = 'upper';
+                    if (toolId === 'newline_convert') step.params.mode = 'unix';
+                    if (toolId === 'repeat_text') step.params.times = 1;
+                    if (toolId === 'insert_content') step.params.position = 0;
+                    
+                    this.workflowSteps.push(step);
+                },
+
+                removeStep(index) {
+                    this.workflowSteps.splice(index, 1);
+                },
+
+                async processTool() {
+                    if (!this.inputContent.trim()) return;
+                    
+                    this.loading = true;
+                    this.result = '';
+                    this.wordCountResult = null;
+
+                    try {
+                        let response;
+                        if (this.isWorkflowMode) {
+                            response = await fetch('/api/workflow', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    content: this.inputContent,
+                                    steps: this.workflowSteps
+                                })
+                            });
+                        } else {
+                            const formData = new FormData();
+                            formData.append('content', this.inputContent);
+                            for (let key in this.params) {
+                                formData.append(key, this.params[key]);
+                            }
+                            
+                            response = await fetch(`/api/tool/${this.currentTool.id}`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                        }
+                        
+                        if (!response.ok) throw new Error('API error');
+                        
+                        const data = await response.json();
+                        
+                        if (this.currentTool.id === 'word_count') {
+                            this.wordCountResult = data.result;
+                        } else {
+                            this.result = data.result;
+                        }
+                    } catch (error) {
+                        this.result = "处理失败: " + error.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                copyResult() {
+                    let content = this.result;
+                    if (this.wordCountResult) {
+                        content = `字符数: ${this.wordCountResult.characters}\n单词数: ${this.wordCountResult.words}\n行数: ${this.wordCountResult.lines}`;
+                    }
+                    
+                    navigator.clipboard.writeText(content).then(() => {
+                        alert('已复制到剪贴板');
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
